@@ -1,17 +1,21 @@
-# syntax=docker/dockerfile:1
-FROM mcr.microsoft.com/dotnet/sdk:5.0 AS build-env
+FROM mcr.microsoft.com/dotnet/aspnet:5.0 AS base
 WORKDIR /app
+EXPOSE 5000
 
-# Copy csproj and restore as distinct layers
-COPY *.csproj ./
-RUN dotnet restore
+ENV ASPNETCORE_URLS=http://+:5000
 
-# Copy everything else and build
-COPY ../engine/examples ./
-RUN dotnet publish -c Release -o out
+FROM mcr.microsoft.com/dotnet/sdk:5.0 AS build
+WORKDIR /src
+COPY ["InventoryManagement.csproj", "./"]
+RUN dotnet restore "InventoryManagement.csproj"
+COPY . .
+WORKDIR "/src/."
+RUN dotnet build "InventoryManagement.csproj" -c Release -o /app/build
 
-# Build runtime image
-FROM mcr.microsoft.com/dotnet/aspnet:3.1
+FROM build AS publish
+RUN dotnet publish "InventoryManagement.csproj" -c Release -o /app/publish
+
+FROM base AS final
 WORKDIR /app
-COPY --from=build-env /app/out .
-ENTRYPOINT ["dotnet", "aspnetapp.dll"]
+COPY --from=publish /app/publish .
+ENTRYPOINT ["dotnet", "InventoryManagement.dll"]
